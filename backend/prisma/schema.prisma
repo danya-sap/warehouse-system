@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  WAREHOUSE_WORKER
+}
+
+enum OrderStatus {
+  NEW        // Создан, товар в резерве
+  COMPLETED  // Отгружен (списан со склада)
+  CANCELLED  // Отменен (резерв снят)
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(WAREHOUSE_WORKER)
+  orders    Order[]  // Связь: заказы, созданные этим пользователем
+  createdAt DateTime @default(now())
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  products Product[]
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  sku         String      @unique
+  name        String
+  description String?
+  unit        String
+  price       Float       @default(0)
+  
+  // Поле для "мягкого" удаления
+  isArchived  Boolean     @default(false) 
+  
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id])
+  
+  stock       Stock[]
+  orderItems  OrderItem[] 
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Stock {
+  id              String    @id @default(uuid())
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id])
+  quantity        Int       
+  initialQuantity Int       
+  price           Decimal   @db.Decimal(10, 2)
+  
+  // Изменяем: теперь это связь, а не просто строка
+  supplierId      String
+  supplier        Supplier  @relation(fields: [supplierId], references: [id])
+  
+  expiryDate      DateTime?
+  receivedAt      DateTime  @default(now())
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique
+  customer    String
+  status      OrderStatus @default(NEW)
+  
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  
+  items       OrderItem[]
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+}
+
+model Supplier {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  contact   String?  // Можно хранить телефон или email
+  stocks    Stock[]
+  createdAt DateTime @default(now())
+}
+
